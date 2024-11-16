@@ -1,7 +1,18 @@
 """Tests for the clickshots package."""
 
+import os
+import pytest
+from unittest.mock import patch, MagicMock
 from clickshots.listeners import ScreenshotListener
-from clickshots.utils import setup_screenshot_method
+from clickshots.utils import setup_screenshot_method, validate_directory
+
+
+@pytest.fixture
+def mock_environment():
+    """Set up test environment."""
+    with patch('platform.system', return_value='Linux'), \
+         patch('subprocess.run', return_value=MagicMock(returncode=0)):
+        yield
 
 
 def test_screenshot_listener_init():
@@ -32,7 +43,15 @@ def test_should_capture():
     assert not listener.should_capture("tap")  # Should be blocked by delay
 
 
-def test_screenshot_method_setup():
+def test_screenshot_method_setup(mock_environment):
     """Test platform-specific screenshot method setup."""
     method, command = setup_screenshot_method()
-    assert method in ["command_line", "pyautogui", "pillow"]
+    assert method == "command_line"
+    assert command == "gnome-screenshot"
+
+
+def test_validate_directory(tmp_path):
+    """Test directory validation."""
+    test_dir = tmp_path / "test_screenshots"
+    assert validate_directory(str(test_dir)) is True
+    assert os.path.exists(test_dir)
