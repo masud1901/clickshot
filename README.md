@@ -1,4 +1,9 @@
 # ClickShots
+# ClickShots
+
+[![Tests](https://github.com/yourusername/clickshots/actions/workflows/tests.yml/badge.svg)](https://github.com/yourusername/clickshots/actions)
+[![PyPI version](https://badge.fury.io/py/clickshots.svg)](https://badge.fury.io/py/clickshots)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A robust automated screenshot capture system that monitors user interactions.
 
