@@ -6,6 +6,7 @@ import time
 import platform
 import subprocess
 import logging
+from PIL import ImageGrab  # We'll use PIL for all platforms
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -31,44 +32,12 @@ DEFAULT_SCREENSHOT_DIR = os.path.join(
 
 def setup_screenshot_method():
     """Configure screenshot method based on platform."""
-    if PLATFORM == "linux":
-        if check_command_exists('gnome-screenshot'):
-            return "command_line", 'gnome-screenshot'
-        else:
-            logger.error("Please install gnome-screenshot")
-            sys.exit(1)
-    elif PLATFORM == "darwin":
-        try:
-            # noqa: F401 for unused import
-            import pyautogui  # noqa: F401
-            return "pyautogui", None
-        except ImportError:
-            logger.error("Please install pyautogui: pip install pyautogui")
-            sys.exit(1)
-    elif PLATFORM == "windows":
-        try:
-            # noqa: F401 for unused import
-            from PIL import ImageGrab  # noqa: F401
-            return "pillow", None
-        except ImportError:
-            logger.error("Please install Pillow: pip install Pillow")
-            sys.exit(1)
-    else:
-        logger.error("Unsupported platform: %s", PLATFORM)
-        sys.exit(1)
-
-
-def check_command_exists(command):
-    """Check if a command exists on Linux."""
     try:
-        result = subprocess.run(
-            ['which', command],
-            capture_output=True,
-            text=True
-        )
-        return result.returncode == 0
-    except subprocess.CalledProcessError:
-        return False
+        from PIL import ImageGrab  # noqa: F401
+        return "pillow", None
+    except ImportError:
+        logger.error("Please install Pillow: pip install Pillow")
+        sys.exit(1)
 
 
 def validate_directory(directory):
@@ -96,7 +65,7 @@ logger.info("Using screenshot method: %s", SCREENSHOT_METHOD)
 
 def capture_screenshot(event_type="event", round_number=0, device_type="mouse",
                       save_dir=None):
-    """Cross-platform screenshot capture function."""
+    """Cross-platform screenshot capture function using PIL."""
     try:
         screenshot_dir = save_dir if save_dir else DEFAULT_SCREENSHOT_DIR
         logger.debug("Using screenshot directory: %s", screenshot_dir)
@@ -111,44 +80,15 @@ def capture_screenshot(event_type="event", round_number=0, device_type="mouse",
         timestamp = time.strftime("%Y%m%d-%H%M%S")
         filename = os.path.join(
             screenshot_dir,
-            f"round_{device_type}_{round_number}_screenshot_{event_type}"
-            f"_{timestamp}.png"
+            "round_{}_{}_{}_{}".format(
+                device_type, round_number, event_type, timestamp
+            ) + ".png"
         )
         logger.debug("Saving screenshot to: %s", filename)
         
-        if SCREENSHOT_METHOD == "command_line":
-            env = os.environ.copy()
-            env["DISPLAY"] = ":0"
-            env["GNOME_SCREENSHOT_SILENCE"] = "1"  # Try to silence notifications
-            env["NO_AT_BRIDGE"] = "1"  # Disable accessibility
-            
-            if SCREENSHOT_COMMAND == 'gnome-screenshot':
-                # Use gnome-screenshot with minimal feedback
-                result = subprocess.run(
-                    [
-                        'gnome-screenshot',
-                        '--file', filename,  # Save to file
-                        '--border-effect', 'none',  # No effects
-                        '--include-border',  # Include window borders
-                        '--display', ':0'  # Specify display
-                    ],
-                    capture_output=True,
-                    text=True,
-                    env=env
-                )
-                
-                if result.returncode != 0:
-                    logger.error("Screenshot failed: %s", result.stderr)
-                    return False
-                    
-        elif SCREENSHOT_METHOD == "pyautogui":
-            import pyautogui
-            screenshot = pyautogui.screenshot()
-            screenshot.save(filename)
-        elif SCREENSHOT_METHOD == "pillow":
-            from PIL import ImageGrab
-            screenshot = ImageGrab.grab()
-            screenshot.save(filename)
+        # Use PIL for all platforms
+        screenshot = ImageGrab.grab()
+        screenshot.save(filename)
             
         if os.path.exists(filename):
             logger.info("Screenshot saved: %s", filename)

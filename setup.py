@@ -10,8 +10,7 @@ setup(
     package_dir={"": "src"},
     install_requires=[
         "pynput",
-        "Pillow",
-        "pyautogui; platform_system == 'Darwin'",
+        "Pillow>=9.0.0",
     ],
     extras_require={
         'test': [
