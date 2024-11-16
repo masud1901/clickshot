@@ -3,8 +3,12 @@
 import os
 import pytest
 from unittest.mock import patch, MagicMock
-from clickshots.listeners import ScreenshotListener
-from clickshots.utils import setup_screenshot_method, validate_directory
+
+# Mock pynput before importing
+with patch('pynput.mouse') as mock_mouse, \
+     patch('pynput.keyboard') as mock_keyboard:
+    from clickshots.listeners import ScreenshotListener
+    from clickshots.utils import setup_screenshot_method, validate_directory
 
 
 @pytest.fixture

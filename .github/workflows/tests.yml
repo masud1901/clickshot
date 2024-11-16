@@ -11,18 +11,25 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+        
+    - name: Set up virtual display
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y xvfb x11-utils gnome-screenshot
+        
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -e .[test]
-    - name: Install system dependencies
+        
+    - name: Run tests with Xvfb
       run: |
-        sudo apt-get update
-        sudo apt-get install -y gnome-screenshot
-    - name: Run tests
-      run: |
-        pytest -v
+        xvfb-run --server-args="-screen 0 1024x768x24" pytest -v
+      env:
+        DISPLAY: ":99.0"
+        PYTHONPATH: ${{ github.workspace }}

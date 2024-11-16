@@ -24,7 +24,7 @@ DELAY_CONFIG = {
 # Default screenshot directory
 DEFAULT_SCREENSHOT_DIR = os.path.join(
     os.path.expanduser("~"),
-    "Pictures" if PLATFORM != "windows" else "My Pictures", 
+    "Pictures" if PLATFORM != "windows" else "My Pictures",
     "clickshots"
 )
 
@@ -39,20 +39,22 @@ def setup_screenshot_method():
             sys.exit(1)
     elif PLATFORM == "darwin":
         try:
-            import pyautogui
+            # noqa: F401 for unused import
+            import pyautogui  # noqa: F401
             return "pyautogui", None
         except ImportError:
             logger.error("Please install pyautogui: pip install pyautogui")
             sys.exit(1)
     elif PLATFORM == "windows":
         try:
-            from PIL import ImageGrab
+            # noqa: F401 for unused import
+            from PIL import ImageGrab  # noqa: F401
             return "pillow", None
         except ImportError:
             logger.error("Please install Pillow: pip install Pillow")
             sys.exit(1)
     else:
-        logger.error("Unsupported platform: " + PLATFORM)
+        logger.error("Unsupported platform: %s", PLATFORM)
         sys.exit(1)
 
 
@@ -128,7 +130,7 @@ def capture_screenshot(event_type="event", round_number=0, device_type="mouse",
                         '--file', filename,  # Save to file
                         '--border-effect', 'none',  # No effects
                         '--include-border',  # Include window borders
-                        '--display', ':0'    # Specify display
+                        '--display', ':0'  # Specify display
                     ],
                     capture_output=True,
                     text=True,
