@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta
 import time
 from pynput import mouse, keyboard
-from .utils import DELAY_CONFIG, capture_screenshot
+from .utils import DELAY_CONFIG, capture_screenshot, get_last_round_number
 
 
 class ScreenshotListener:
@@ -20,22 +20,18 @@ class ScreenshotListener:
         self.last_screenshot_time = {}
         self.button_states = {
             mouse.Button.left: False,
-            mouse.Button.right: False,
-            'tap_time': 0,
-            'last_x': 0,
-            'last_y': 0,
         }
         self.key_states = {
             keyboard.Key.alt_l: False,
             keyboard.Key.alt_r: False,
+            keyboard.Key.ctrl_l: False,
+            keyboard.Key.ctrl_r: False,
         }
-        self.current_keys = set()
-        self.MOUSE_TOGGLE_KEYS = {keyboard.Key.ctrl_l, keyboard.Key.shift_l}
         self.save_dir = save_dir
 
     def should_capture(self, event_type):
         """Check if screenshot capture is allowed based on timing and state."""
-        if event_type in ["tap", "right_tap"]:
+        if event_type in ["left_click", "right_click", "middle_click"]:
             if not self.mouse_screenshot_enabled:
                 return False
                 
@@ -48,8 +44,8 @@ class ScreenshotListener:
             delay = timedelta(seconds=DELAY_CONFIG[event_type])
             self.last_screenshot_time[event_type] = current_time - delay
         
-        last_time = self.last_screenshot_time[event_type]
-        time_passed = (current_time - last_time).total_seconds()
+        time_delta = current_time - self.last_screenshot_time[event_type]
+        time_passed = time_delta.total_seconds()
         
         if time_passed >= DELAY_CONFIG[event_type]:
             self.last_screenshot_time[event_type] = current_time
@@ -58,53 +54,58 @@ class ScreenshotListener:
 
     def on_click(self, x, y, button, pressed):
         """Handle mouse click events."""
-        if button in self.button_states:
+        if button == mouse.Button.left:
             self.button_states[button] = pressed
-
-        if pressed and self.mouse_screenshot_enabled:
-            if button == mouse.Button.left:
-                capture_screenshot(
-                    event_type="tap",
-                    round_number=self.mouse_round_counter,
-                    device_type="mouse",
-                    save_dir=self.save_dir
-                )
-            elif button == mouse.Button.right:
-                capture_screenshot(
-                    event_type="right_tap",
-                    round_number=self.mouse_round_counter,
-                    device_type="mouse",
-                    save_dir=self.save_dir
-                )
+            
+            if pressed and self.mouse_screenshot_enabled:
+                try:
+                    capture_screenshot(
+                        event_type="left_click",
+                        round_number=self.mouse_round_counter,
+                        device_type="mouse",
+                        save_dir=self.save_dir
+                    )
+                except Exception as e:
+                    print(f"Input detection error: {e}")
 
     def on_press(self, key):
         """Handle keyboard press events."""
         try:
+            # Update key states
             if key in self.key_states:
                 self.key_states[key] = True
-                
-            self.current_keys.add(key)
             
-            # Toggle mouse capture with Ctrl+Shift
-            if self.MOUSE_TOGGLE_KEYS.issubset(self.current_keys):
+            # Check for Ctrl + M combination for mouse/touchpad toggle
+            ctrl_pressed = (self.key_states[keyboard.Key.ctrl_l] or 
+                          self.key_states[keyboard.Key.ctrl_r])
+            if (ctrl_pressed and hasattr(key, 'char') and key.char == 'm'):
                 self.mouse_screenshot_enabled = not self.mouse_screenshot_enabled
                 if self.mouse_screenshot_enabled:
-                    self.mouse_round_counter += 1
+                    self.mouse_round_counter = (
+                        get_last_round_number(self.save_dir) + 1
+                    )
                 status = "enabled" if self.mouse_screenshot_enabled else "disabled"
-                print("\nMouse screenshot capturing", status)
+                print(f"\nMouse/touchpad screenshot capturing {status}")
+                if self.mouse_screenshot_enabled:
+                    print(f"Starting round {self.mouse_round_counter}")
                 return
-                
-            # Toggle keyboard capture with Alt+\
+            
+            # Check for Alt + \ combination
             alt_pressed = (self.key_states[keyboard.Key.alt_l] or 
-                         self.key_states[keyboard.Key.alt_r])
+                            self.key_states[keyboard.Key.alt_r])
             if hasattr(key, 'char') and key.char == '\\' and alt_pressed:
                 self.keyboard_screenshot_enabled = not self.keyboard_screenshot_enabled
                 if self.keyboard_screenshot_enabled:
-                    self.keyboard_round_counter += 1
-                status = "enabled" if self.keyboard_screenshot_enabled else "disabled"
-                print("\nKeyboard screenshot capturing", status)
+                    self.keyboard_round_counter = (
+                        get_last_round_number(self.save_dir) + 1
+                    )
+                status = ("enabled" if self.keyboard_screenshot_enabled 
+                         else "disabled")
+                print(f"\nKeyboard screenshot capturing {status}")
+                if self.keyboard_screenshot_enabled:
+                    print(f"Starting round {self.keyboard_round_counter}")
                 return
-                
+            
             # Handle space/enter key screenshots
             if self.keyboard_screenshot_enabled:
                 if key in [keyboard.Key.space, keyboard.Key.enter]:
@@ -116,22 +117,19 @@ class ScreenshotListener:
                     )
                     
         except Exception as e:
-            print("Keyboard detection error:", e)
+            print(f"Keyboard detection error: {e}")
 
     def on_release(self, key):
         """Handle keyboard release events."""
         if key in self.key_states:
             self.key_states[key] = False
-        self.current_keys.discard(key)
 
     def start(self):
         """Start the mouse and keyboard listeners."""
         try:
             self._running = True
             
-            self.mouse_listener = mouse.Listener(
-                on_click=self.on_click
-            )
+            self.mouse_listener = mouse.Listener(on_click=self.on_click)
             self.keyboard_listener = keyboard.Listener(
                 on_press=self.on_press,
                 on_release=self.on_release
@@ -140,10 +138,8 @@ class ScreenshotListener:
             self.mouse_listener.start()
             self.keyboard_listener.start()
 
-            print("\nScreenshot capture started. Use the following controls:")
-            print("- Ctrl + Shift: Toggle mouse/touchpad screenshots")
-            print("- Alt + \\: Toggle keyboard screenshots")
-            print("- Ctrl + C: Exit program")
+            next_round = get_last_round_number(self.save_dir) + 1
+            print(f"\nContinuing from round {next_round}")
 
             while self._running:
                 time.sleep(0.1)
@@ -152,7 +148,7 @@ class ScreenshotListener:
             print("\nReceived interrupt signal...")
             self.stop()
         except Exception as e:
-            print("Error in listeners:", e)
+            print(f"Error in listeners: {e}")
         finally:
             self.stop()
 
